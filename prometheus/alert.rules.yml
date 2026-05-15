@@ -1,0 +1,11 @@
+groups:
+  - name: kafka_alerts
+    rules:
+      - alert: KafkaBrokerDown
+        expr: kafka_brokers == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Kafka Broker is down"
+          description: "No Kafka brokers are running."
