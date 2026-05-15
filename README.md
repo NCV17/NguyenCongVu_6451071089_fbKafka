@@ -1,98 +1,244 @@
-# Hệ Thống Facebook Event Processor (Realtime AI Auto-Reply & Anti-Spam)
+# 🚀 Facebook Webhook + Kafka — Microservice Architecture
 
-Đây là hệ thống xử lý sự kiện thời gian thực (Webhook) từ Facebook Page, kết hợp với Apache Kafka, AI Gemini để tự động hóa chăm sóc khách hàng (Auto-Reply) và chống Spam.
+Hệ thống xử lý sự kiện Facebook Page theo kiến trúc **event-driven microservice** với **retry pipeline** và **dead letter queue**.
 
-## 🏗 Cấu trúc Dự Án
-Hệ thống được thiết kế theo kiến trúc Microservices điều hướng bằng Kafka.
+---
 
-```text
-fb_api/
-├── docker-compose.yml       # Cấu hình hạ tầng (Kafka, Zookeeper, DB, Monitoring...)
-├── services/
-│   ├── webhook-service/     # Entry point nhận Webhook, chuẩn hóa và đẩy vào Kafka
-│   ├── core-service/        # Nhận event từ Kafka, lọc Spam, phân tích AI và gọi FB API
-│   └── retry-service/       # (TODO) Xử lý các event bị lỗi từ topic send_failed
-└── README.md                # Tài liệu dự án
+## 🛠️ Cập nhật mới nhất (Changelog)
+- **Tắt FAKE_MODE**: Chuyển `FAKE_MODE=false` trong `backend-api` và tích hợp `axios` để chính thức gọi Facebook Graph API thật.
+- **Nâng cấp xử lý Spam**: Đổi chiến lược từ "Ẩn (Hide)" sang **"Xóa vĩnh viễn (Delete)"** bình luận rác. Giúp loại bỏ hoàn toàn dấu vết spam thay vì chỉ ẩn (Shadowban) như trước.
+- **Fix lỗi 400 Bad Request**: Chuyển đổi việc gửi `PAGE_ACCESS_TOKEN` từ body JSON sang tham số URL (Query Parameter `?access_token=...`) để đáp ứng đúng yêu cầu của Graph API, đảm bảo Auto-reply mượt mà.
+- **Dọn dẹp code**: Xóa file `facebook-api.js` thừa bên `core-service`, đảm bảo nguyên tắc kiến trúc Microservices (chỉ `backend-api` mới được gọi ra ngoài Facebook).
+
+---
+
+## 🏗️ Kiến trúc tổng quan
+
+```
+Facebook
+   │
+   ▼
+webhook-service  (port 3001)
+   │  publish
+   ▼
+Kafka topic: raw_events
+   │  consume
+   ▼
+core-service
+├── spam-filter.js      → phát hiện spam
+├── ai-classifier.js    → phân tích AI (Gemini / OpenAI)
+└── decision-engine.js  → quyết định hành động
+   │  publish
+   ▼
+Kafka topic: reply_commands
+   │  consume
+   ▼
+backend-api
+└── facebook-api.js     → gọi Facebook Graph API
+   │
+   ├── SUCCESS → log ✅
+   │
+   └── FAIL → publish
+         ▼
+      Kafka topic: send_failed
+         │  consume
+         ▼
+      retry-service
+      └── retry-handler.js  → exponential backoff
+         │
+         ├── retry_count < 3 → publish → send_retry → backend-api retry
+         │
+         └── retry_count >= 3 → publish → dead_letter ☠️
 ```
 
-## 🚀 Các Tính Năng Đã Hoàn Thiện (Bài 1, 2, 3)
+---
 
-### 1. Hạ tầng Hệ Thống (Infrastructure)
-- Cấu hình thành công `docker-compose.yml` gồm các container: **Zookeeper, Kafka, Kafka UI (Port 8080), Prometheus, Alertmanager, PostgreSQL**.
-- Đã tự động tạo các topic Kafka cần thiết: `raw_events`, `send_failed`.
+## 📦 Services
 
-### 2. Webhook Service (Port: 3001)
-- Lắng nghe sự kiện từ Facebook (Comments, Messages, Posts).
-- **Chống lặp (Infinite Loop):** Tự động bỏ qua các bình luận/tin nhắn do chính Bot (Page) phát ra để tránh vòng lặp tự nói chuyện một mình.
-- Chuẩn hóa payload từ cấu trúc phức tạp của Facebook về một Schema chung.
-- Đẩy dữ liệu (Publish) vào Kafka topic `raw_events`.
+### 1. `webhook-service` — Cổng nhận sự kiện Facebook
+| File | Chức năng |
+|------|-----------|
+| `src/index.js` | Express server, verify webhook |
+| `src/webhook-handler.js` | Normalize event → publish `raw_events` |
+| `src/kafka-producer.js` | Kafka producer |
+| `src/signature-verifier.js` | Xác thực chữ ký Facebook |
 
-### 3. Core Service (AI & Action Engine)
-- **Kafka Consumer:** Tiêu thụ liên tục các sự kiện từ topic `raw_events`.
-- **Spam Filter (`spam-filter.js`):** 
-  - Tự động nhận diện các URL chứa `http/https` hoặc các domain độc hại dạng `spam.link`, `www.domain.com`.
-- **AI Classifier (`ai-classifier.js`):** 
-  - Tích hợp thành công **Gemini 2.5 Flash** (hỗ trợ ép kiểu trả về nguyên bản JSON).
-  - Phân tích Ý định (Intent: hỏi giá, khiếu nại, hỗ trợ...) và Cảm xúc (Sentiment: Tích cực, Tiêu cực, Trung tính).
-- **Decision Engine & Facebook API (`decision-engine.js`, `facebook-api.js`):**
-  - **Spam:** Trực tiếp gọi Graph API (`Form Data`) để ẩn (`is_hidden = true`) các bình luận chứa link rác.
-  - **Tích cực:** Tự động chọn ngẫu nhiên 1 trong 4 câu cảm ơn để Reply khách hàng.
-  - **Tiêu cực:** Tự động chọn ngẫu nhiên 1 trong 4 câu xin lỗi để Reply khách hàng.
-  - **Hỏi giá:** Tự động báo giá và điều hướng inbox.
-- **Dead Letter Queue (DLQ):** Mọi lỗi phát sinh (VD: Lỗi gọi AI, lỗi token hết hạn) sẽ đẩy event đó qua topic `send_failed` để xử lý lại sau, không bị mất data.
+### 2. `core-service` — Xử lý AI & ra quyết định
+| File | Chức năng |
+|------|-----------|
+| `src/index.js` | Consumer `raw_events` → pipeline xử lý |
+| `src/spam-filter.js` | Phát hiện spam, link độc hại |
+| `src/ai-classifier.js` | Gọi Gemini/OpenAI phân tích intent + sentiment |
+| `src/decision-engine.js` | Ra quyết định: reply / hide / ignore |
+| `src/kafka-producer.js` | Publish `reply_commands` |
 
-## ⚙️ Cấu Hình Môi Trường (Environment Variables)
+> ⚠️ **Core-service KHÔNG gọi Facebook API trực tiếp**
 
-Hệ thống yêu cầu các file `.env` ở mỗi service:
+### 3. `backend-api` — Thực thi lệnh lên Facebook
+| File | Chức năng |
+|------|-----------|
+| `src/index.js` | Entry point |
+| `src/kafka-consumer.js` | Consume `reply_commands` + `send_retry` |
+| `src/kafka-producer.js` | Publish `send_failed` khi lỗi |
+| `src/facebook-api.js` | Wrapper gọi Facebook Graph API |
+| `src/handlers/command-handler.js` | Route action → FB API |
 
-**1. `services/webhook-service/.env`**
-```env
-PORT=3001
-FB_VERIFY_TOKEN=KHOA_BAO_MAT_CUA_BAN
-FB_APP_SECRET=SECRET_CUA_APP_FACEBOOK
-KAFKA_BROKERS=localhost:9092
-PAGE_ACCESS_TOKEN=EAA... (Mã Token lấy từ Graph API Explorer)
+### 4. `retry-service` — Retry pipeline
+| File | Chức năng |
+|------|-----------|
+| `src/index.js` | Entry point |
+| `src/kafka-consumer.js` | Consume `send_failed` |
+| `src/kafka-producer.js` | Publish `send_retry` hoặc `dead_letter` |
+| `src/retry-handler.js` | Exponential backoff logic |
+
+---
+
+## 📨 Kafka Topics
+
+| Topic | Producer | Consumer | Mô tả |
+|-------|----------|----------|-------|
+| `raw_events` | webhook-service | core-service | Sự kiện thô từ Facebook |
+| `reply_commands` | core-service | backend-api | Lệnh thực thi lên Facebook |
+| `send_failed` | backend-api | retry-service | Lệnh thất bại cần retry |
+| `send_retry` | retry-service | backend-api | Retry sau backoff |
+| `dead_letter` | retry-service | _(monitor)_ | Thất bại vĩnh viễn (>= 3 lần) |
+
+---
+
+## 🔄 Retry Pipeline
+
+```
+send_failed (retry_count=1)
+   ↓ delay = 1000 * 2^(1-1) = 1s
+send_retry → backend-api
+
+send_failed (retry_count=2)
+   ↓ delay = 1000 * 2^(2-1) = 2s
+send_retry → backend-api
+
+send_failed (retry_count=3)
+   ↓ retry_count >= MAX_RETRIES (3)
+dead_letter ☠️
 ```
 
-**2. `services/core-service/.env`**
+---
+
+## ⚙️ Cấu hình `.env`
+
+### `core-service/.env`
 ```env
 KAFKA_BROKERS=localhost:9092
 KAFKA_GROUP_ID=core-service-group
-AI_PROVIDER=GEMINI
-GEMINI_API_KEY=AIzaSy... (API Key của Google AI Studio)
-PAGE_ACCESS_TOKEN=EAA... (Mã Token lấy từ Graph API Explorer, lưu ý token chỉ sống 1-2h nếu không dùng long-lived)
+AI_PROVIDER=GEMINI        # hoặc OPENAI
+GEMINI_API_KEY=...
+OPENAI_API_KEY=...
 ```
 
-## 🛠 Hướng Dẫn Chạy Dự Án
+### `backend-api/.env`
+```env
+KAFKA_BROKERS=localhost:9092
+KAFKA_GROUP_ID=backend-api-group
+PAGE_ACCESS_TOKEN=EAA...
+FAKE_MODE=false           # false = gọi thật FB API, true = giả lập FB API (demo)
+```
 
-**Bước 1: Chạy hạ tầng Kafka**
+### `retry-service/.env`
+```env
+KAFKA_BROKERS=localhost:9092
+KAFKA_GROUP_ID=retry-service-group
+MAX_RETRIES=3
+```
+
+---
+
+## 🚀 Hướng dẫn chạy
+
+### 1. Khởi động Kafka (Docker)
 ```bash
-cd "d:/Lập trình API/fb_api"
 docker-compose up -d
 ```
-*(Vào http://localhost:8080 để xem Kafka UI)*
 
-**Bước 2: Mở đường hầm Ngrok (Dành cho Webhook)**
-```bash
-ngrok http 3001
-```
-*(Copy link HTTPS dán vào cấu hình Webhook trên trang developers.facebook.com)*
+Kafka UI: http://localhost:8080
 
-**Bước 3: Chạy Webhook Service**
+### 2. Chạy từng service (terminal riêng)
+
 ```bash
-cd "d:/Lập trình API/fb_api/services/webhook-service"
+# Terminal 1 — Webhook Service
+cd services/webhook-service
+npm run dev
+
+# Terminal 2 — Core Service
+cd services/core-service
+npm run dev
+
+# Terminal 3 — Backend API
+cd services/backend-api
+npm run dev
+
+# Terminal 4 — Retry Service
+cd services/retry-service
 npm run dev
 ```
 
-**Bước 4: Chạy Core Service**
+### 3. Test flow
 ```bash
-cd "d:/Lập trình API/fb_api/services/core-service"
-npm run dev
+# Gửi event giả lập vào raw_events (cần kafka-console-producer hoặc Kafka UI)
+# Hoặc POST webhook giả lập:
+curl -X POST http://localhost:3001/webhook \
+  -H "Content-Type: application/json" \
+  -d '{"object":"page","entry":[...]}'
 ```
 
-*(Lưu ý: Bất cứ khi nào Facebook báo lỗi `Error validating access token: Session has expired`, bạn cần vào Graph API sinh Token mới và chép đè vào 2 file `.env`, sau đó khởi động lại server)*
+---
 
-## 🎯 Các Bước Phát Triển Tiếp Theo (Next Steps)
-1. **Retry Service:** Code thư mục `retry-service` để tự động kéo các event lỗi từ topic `send_failed`, đợi một thời gian (Exponential Backoff) rồi chạy lại quy trình.
-2. **Database Storage:** Lưu trữ lịch sử tất cả các Event, Intent, Sentiment, và Action vào PostgreSQL (hiện tại PostgreSQL đã chạy trên docker nhưng chưa kết nối).
-3. **Dashboard / Metrics:** Theo dõi số lượng spam, tin nhắn trên biểu đồ Grafana thông qua Prometheus Metrics.
+## 🔍 Monitoring
+
+| Service | URL |
+|---------|-----|
+| Kafka UI | http://localhost:8080 |
+| Prometheus | http://localhost:9090 |
+| Alertmanager | http://localhost:9093 |
+
+---
+
+## 📋 Message Schemas
+
+### `reply_commands`
+```json
+{
+  "schema_version": 1,
+  "command_id": "uuid-v4",
+  "event_id": "evt_001",
+  "action": "reply | hide | delete | create_post",
+  "target": { "comment_id": "123", "sender_id": null, "type": "comment" },
+  "reply_text": "Cảm ơn bạn đã ủng hộ shop!",
+  "intent": "positive_feedback",
+  "sentiment": "positive",
+  "created_at": "2026-05-15T10:00:00.000Z"
+}
+```
+
+### `send_failed`
+```json
+{
+  "schema_version": 1,
+  "command_id": "cmd_001",
+  "event_id": "evt_001",
+  "retry_count": 1,
+  "last_error": "Facebook timeout",
+  "payload": { "action": "reply", "reply_text": "Cảm ơn bạn" },
+  "failed_at": "2026-05-15T10:00:01.000Z"
+}
+```
+
+### `dead_letter`
+```json
+{
+  "schema_version": 1,
+  "command_id": "cmd_001",
+  "event_id": "evt_001",
+  "retry_count": 3,
+  "final_error": "Facebook timeout after maximum retries",
+  "dead_at": "2026-05-15T10:00:10.000Z"
+}
+```

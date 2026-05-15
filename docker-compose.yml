@@ -41,11 +41,14 @@ services:
       "
       echo -e 'Waiting for Kafka to be ready...'
       cub kafka-ready -b kafka:29092 1 30
-      
+
       echo -e 'Creating kafka topics...'
-      kafka-topics --bootstrap-server kafka:29092 --create --if-not-exists --topic raw_events --replication-factor 1 --partitions 3
-      kafka-topics --bootstrap-server kafka:29092 --create --if-not-exists --topic send_failed --replication-factor 1 --partitions 3
-      
+      kafka-topics --bootstrap-server kafka:29092 --create --if-not-exists --topic raw_events      --replication-factor 1 --partitions 3
+      kafka-topics --bootstrap-server kafka:29092 --create --if-not-exists --topic reply_commands  --replication-factor 1 --partitions 3
+      kafka-topics --bootstrap-server kafka:29092 --create --if-not-exists --topic send_failed     --replication-factor 1 --partitions 3
+      kafka-topics --bootstrap-server kafka:29092 --create --if-not-exists --topic send_retry      --replication-factor 1 --partitions 3
+      kafka-topics --bootstrap-server kafka:29092 --create --if-not-exists --topic dead_letter     --replication-factor 1 --partitions 1
+
       echo -e 'Successfully created the following topics:'
       kafka-topics --bootstrap-server kafka:29092 --list
       "
