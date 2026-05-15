@@ -1,10 +1,10 @@
 const makeDecision = async (event, spamResult, aiResult) => {
   console.log(`[Decision Engine] Đang xử lý [${event.type.toUpperCase()}] từ ${event.senderName}`);
   
-  // 1. Xử lý Spam -> Ẩn bình luận
+  // 1. Xử lý Spam -> Xóa bình luận
   if (spamResult.isSpam) {
-    console.log(`=> HÀNH ĐỘNG: [ẨN BÌNH LUẬN] - Lý do: Spam / Chứa liên kết.`);
-    return 'hidden';
+    console.log(`=> HÀNH ĐỘNG: [XÓA BÌNH LUẬN] - Lý do: Spam / Chứa liên kết.`);
+    return 'delete';
   }
 
   // Nếu API AI chưa cấu hình thì bỏ qua
