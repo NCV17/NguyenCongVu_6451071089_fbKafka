@@ -125,29 +125,28 @@ dead_letter ☠️
 
 ## ⚙️ Cấu hình `.env`
 
-### `core-service/.env`
-```env
-KAFKA_BROKERS=localhost:9092
-KAFKA_GROUP_ID=core-service-group
-AI_PROVIDER=GEMINI        # hoặc OPENAI
-GEMINI_API_KEY=...
-OPENAI_API_KEY=...
-```
+Tất cả cấu hình môi trường hiện được đặt chung tại một file **`.env` ở thư mục gốc (root)** của dự án để dễ quản lý. File `.env` sẽ trông như sau:
 
-### `backend-api/.env`
 ```env
+# ==== KAFKA ====
 KAFKA_BROKERS=localhost:9092
-KAFKA_GROUP_ID=backend-api-group
-PAGE_ACCESS_TOKEN=EAA...
-FAKE_MODE=false           # false = gọi thật FB API, true = giả lập FB API (demo)
-```
 
-### `retry-service/.env`
-```env
-KAFKA_BROKERS=localhost:9092
-KAFKA_GROUP_ID=retry-service-group
+# ==== FACEBOOK API ====
+PAGE_ACCESS_TOKEN=EAASXYz...
+FB_APP_SECRET=c92d29583526e62dae3451158faf33e3
+FB_VERIFY_TOKEN=my_verify_token_123
+FB_API_VERSION=v19.0
+FAKE_MODE=false
+
+# ==== AI CONFIG ====
+AI_PROVIDER=GEMINI
+GEMINI_API_KEY=AIzaSy...
+
+# ==== RETRY SERVICE ====
 MAX_RETRIES=3
 ```
+
+> **Lưu ý**: Các biến riêng biệt cho từng service (như `KAFKA_GROUP_ID`, `PORT`) đã được thiết lập sẵn trong file `docker-compose.yml`.
 
 ---
 
