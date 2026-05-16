@@ -1,244 +1,87 @@
-# 🚀 Facebook Webhook + Kafka — Microservice Architecture
+# Hệ thống Xử lý Sự kiện Facebook Webhook
 
-Hệ thống xử lý sự kiện Facebook Page theo kiến trúc **event-driven microservice** với **retry pipeline** và **dead letter queue**.
+Hệ thống xử lý sự kiện Facebook Page sử dụng kiến trúc Microservices dựa trên sự kiện (Event-driven) với Kafka. Hệ thống tích hợp AI để phân tích nội dung và có cơ chế Retry (backoff) tự động cho các lệnh thất bại.
 
----
+## Kiến trúc hệ thống
 
-## 🛠️ Cập nhật mới nhất (Changelog)
-- **Tắt FAKE_MODE**: Chuyển `FAKE_MODE=false` trong `backend-api` và tích hợp `axios` để chính thức gọi Facebook Graph API thật.
-- **Nâng cấp xử lý Spam**: Đổi chiến lược từ "Ẩn (Hide)" sang **"Xóa vĩnh viễn (Delete)"** bình luận rác. Giúp loại bỏ hoàn toàn dấu vết spam thay vì chỉ ẩn (Shadowban) như trước.
-- **Fix lỗi 400 Bad Request**: Chuyển đổi việc gửi `PAGE_ACCESS_TOKEN` từ body JSON sang tham số URL (Query Parameter `?access_token=...`) để đáp ứng đúng yêu cầu của Graph API, đảm bảo Auto-reply mượt mà.
-- **Dọn dẹp code**: Xóa file `facebook-api.js` thừa bên `core-service`, đảm bảo nguyên tắc kiến trúc Microservices (chỉ `backend-api` mới được gọi ra ngoài Facebook).
+Hệ thống bao gồm các thành phần chính:
+1. **Webhook Service**: Tiếp nhận sự kiện từ Facebook, xác thực chữ ký và đẩy vào Kafka topic `raw_events`.
+2. **Core Service**: Tiêu thụ `raw_events`, sử dụng AI (Gemini/OpenAI) để phân loại ý định (intent), cảm xúc (sentiment) và ra quyết định hành động.
+3. **Backend API**: Thực thi các hành động (reply, hide, delete) bằng cách gọi trực tiếp Facebook Graph API.
+4. **Retry Service**: Quản lý các lệnh bị lỗi, thực hiện gửi lại với cơ chế backoff (thời gian chờ tăng dần) trước khi đưa vào Dead Letter Queue.
 
----
+## Danh sách dịch vụ và Port
 
-## 🏗️ Kiến trúc tổng quan
+| Dịch vụ | Port | Mô tả |
+|---------|------|-------|
+| Webhook Service | 3001 | Tiếp nhận webhook từ Facebook |
+| Core Service | 3002 | Xử lý logic AI và ra quyết định |
+| Backend API | 3000 | Gọi API Facebook Graph |
+| Retry Service | 3003 | Xử lý retry và Dead Letter Queue |
+| Kafka UI | 8080 | Giao diện quản lý Kafka |
+| Prometheus | 9090 | Theo dõi thông số hệ thống |
+| Alertmanager | 9093 | Quản lý cảnh báo |
+| PostgreSQL | 5432 | Cơ sở dữ liệu lưu trữ |
 
-```
-Facebook
-   │
-   ▼
-webhook-service  (port 3001)
-   │  publish
-   ▼
-Kafka topic: raw_events
-   │  consume
-   ▼
-core-service
-├── spam-filter.js      → phát hiện spam
-├── ai-classifier.js    → phân tích AI (Gemini / OpenAI)
-└── decision-engine.js  → quyết định hành động
-   │  publish
-   ▼
-Kafka topic: reply_commands
-   │  consume
-   ▼
-backend-api
-└── facebook-api.js     → gọi Facebook Graph API
-   │
-   ├── SUCCESS → log ✅
-   │
-   └── FAIL → publish
-         ▼
-      Kafka topic: send_failed
-         │  consume
-         ▼
-      retry-service
-      └── retry-handler.js  → exponential backoff
-         │
-         ├── retry_count < 3 → publish → send_retry → backend-api retry
-         │
-         └── retry_count >= 3 → publish → dead_letter ☠️
-```
+## Cấu hình môi trường (.env)
 
----
+Dự án sử dụng duy nhất một file `.env` tại thư mục gốc để quản lý cấu hình cho tất cả các dịch vụ. Các biến môi trường riêng biệt cho từng container (như `KAFKA_GROUP_ID`) được cấu hình trực tiếp trong file `docker-compose.yml`.
 
-## 📦 Services
+Nội dung file `.env` tham khảo:
 
-### 1. `webhook-service` — Cổng nhận sự kiện Facebook
-| File | Chức năng |
-|------|-----------|
-| `src/index.js` | Express server, verify webhook |
-| `src/webhook-handler.js` | Normalize event → publish `raw_events` |
-| `src/kafka-producer.js` | Kafka producer |
-| `src/signature-verifier.js` | Xác thực chữ ký Facebook |
-
-### 2. `core-service` — Xử lý AI & ra quyết định
-| File | Chức năng |
-|------|-----------|
-| `src/index.js` | Consumer `raw_events` → pipeline xử lý |
-| `src/spam-filter.js` | Phát hiện spam, link độc hại |
-| `src/ai-classifier.js` | Gọi Gemini/OpenAI phân tích intent + sentiment |
-| `src/decision-engine.js` | Ra quyết định: reply / hide / ignore |
-| `src/kafka-producer.js` | Publish `reply_commands` |
-
-> ⚠️ **Core-service KHÔNG gọi Facebook API trực tiếp**
-
-### 3. `backend-api` — Thực thi lệnh lên Facebook
-| File | Chức năng |
-|------|-----------|
-| `src/index.js` | Entry point |
-| `src/kafka-consumer.js` | Consume `reply_commands` + `send_retry` |
-| `src/kafka-producer.js` | Publish `send_failed` khi lỗi |
-| `src/facebook-api.js` | Wrapper gọi Facebook Graph API |
-| `src/handlers/command-handler.js` | Route action → FB API |
-
-### 4. `retry-service` — Retry pipeline
-| File | Chức năng |
-|------|-----------|
-| `src/index.js` | Entry point |
-| `src/kafka-consumer.js` | Consume `send_failed` |
-| `src/kafka-producer.js` | Publish `send_retry` hoặc `dead_letter` |
-| `src/retry-handler.js` | Exponential backoff logic |
-
----
-
-## 📨 Kafka Topics
-
-| Topic | Producer | Consumer | Mô tả |
-|-------|----------|----------|-------|
-| `raw_events` | webhook-service | core-service | Sự kiện thô từ Facebook |
-| `reply_commands` | core-service | backend-api | Lệnh thực thi lên Facebook |
-| `send_failed` | backend-api | retry-service | Lệnh thất bại cần retry |
-| `send_retry` | retry-service | backend-api | Retry sau backoff |
-| `dead_letter` | retry-service | _(monitor)_ | Thất bại vĩnh viễn (>= 3 lần) |
-
----
-
-## 🔄 Retry Pipeline
-
-```
-send_failed (retry_count=1)
-   ↓ delay = 1000 * 2^(1-1) = 1s
-send_retry → backend-api
-
-send_failed (retry_count=2)
-   ↓ delay = 1000 * 2^(2-1) = 2s
-send_retry → backend-api
-
-send_failed (retry_count=3)
-   ↓ retry_count >= MAX_RETRIES (3)
-dead_letter ☠️
-```
-
----
-
-## ⚙️ Cấu hình `.env`
-
-### `core-service/.env`
 ```env
+# KAFKA
 KAFKA_BROKERS=localhost:9092
-KAFKA_GROUP_ID=core-service-group
-AI_PROVIDER=GEMINI        # hoặc OPENAI
-GEMINI_API_KEY=...
-OPENAI_API_KEY=...
-```
 
-### `backend-api/.env`
-```env
-KAFKA_BROKERS=localhost:9092
-KAFKA_GROUP_ID=backend-api-group
-PAGE_ACCESS_TOKEN=EAA...
-FAKE_MODE=false           # false = gọi thật FB API, true = giả lập FB API (demo)
-```
+# FACEBOOK API
+PAGE_ACCESS_TOKEN=your_page_access_token
+FB_APP_SECRET=your_app_secret
+FB_VERIFY_TOKEN=your_verify_token
+FB_API_VERSION=v19.0
+FAKE_MODE=false
 
-### `retry-service/.env`
-```env
-KAFKA_BROKERS=localhost:9092
-KAFKA_GROUP_ID=retry-service-group
+# AI CONFIG
+AI_PROVIDER=GEMINI
+GEMINI_API_KEY=your_gemini_api_key
+
+# RETRY CONFIG
 MAX_RETRIES=3
 ```
 
----
+## Hướng dẫn vận hành
 
-## 🚀 Hướng dẫn chạy
+Hệ thống được thiết kế để chạy hoàn toàn trên Docker Compose.
 
-### 1. Khởi động Kafka (Docker)
+### 1. Khởi động hệ thống
+Chạy lệnh sau tại thư mục gốc để khởi động tất cả các dịch vụ:
 ```bash
 docker-compose up -d
 ```
 
-Kafka UI: http://localhost:8080
-
-### 2. Chạy từng service (terminal riêng)
-
+### 2. Cập nhật cấu hình
+Khi thay đổi nội dung file `.env` hoặc `docker-compose.yml`, cần chạy lệnh sau để Docker tái tạo container với cấu hình mới:
 ```bash
-# Terminal 1 — Webhook Service
-cd services/webhook-service
-npm run dev
-
-# Terminal 2 — Core Service
-cd services/core-service
-npm run dev
-
-# Terminal 3 — Backend API
-cd services/backend-api
-npm run dev
-
-# Terminal 4 — Retry Service
-cd services/retry-service
-npm run dev
+docker-compose up -d
 ```
 
-### 3. Test flow
+### 3. Kiểm tra Log
+Theo dõi log của tất cả các dịch vụ:
 ```bash
-# Gửi event giả lập vào raw_events (cần kafka-console-producer hoặc Kafka UI)
-# Hoặc POST webhook giả lập:
-curl -X POST http://localhost:3001/webhook \
-  -H "Content-Type: application/json" \
-  -d '{"object":"page","entry":[...]}'
+docker-compose logs -f
+```
+Hoặc theo dõi một dịch vụ cụ thể:
+```bash
+docker-compose logs -f backend-api
 ```
 
----
-
-## 🔍 Monitoring
-
-| Service | URL |
-|---------|-----|
-| Kafka UI | http://localhost:8080 |
-| Prometheus | http://localhost:9090 |
-| Alertmanager | http://localhost:9093 |
-
----
-
-## 📋 Message Schemas
-
-### `reply_commands`
-```json
-{
-  "schema_version": 1,
-  "command_id": "uuid-v4",
-  "event_id": "evt_001",
-  "action": "reply | hide | delete | create_post",
-  "target": { "comment_id": "123", "sender_id": null, "type": "comment" },
-  "reply_text": "Cảm ơn bạn đã ủng hộ shop!",
-  "intent": "positive_feedback",
-  "sentiment": "positive",
-  "created_at": "2026-05-15T10:00:00.000Z"
-}
+### 4. Dừng hệ thống
+```bash
+docker-compose down
 ```
 
-### `send_failed`
-```json
-{
-  "schema_version": 1,
-  "command_id": "cmd_001",
-  "event_id": "evt_001",
-  "retry_count": 1,
-  "last_error": "Facebook timeout",
-  "payload": { "action": "reply", "reply_text": "Cảm ơn bạn" },
-  "failed_at": "2026-05-15T10:00:01.000Z"
-}
-```
+## Luồng xử lý Retry và Dead Letter Queue
 
-### `dead_letter`
-```json
-{
-  "schema_version": 1,
-  "command_id": "cmd_001",
-  "event_id": "evt_001",
-  "retry_count": 3,
-  "final_error": "Facebook timeout after maximum retries",
-  "dead_at": "2026-05-15T10:00:10.000Z"
-}
-```
+1. Khi **Backend API** gọi Facebook Graph API thất bại, thông điệp sẽ được đẩy vào topic `send_failed`.
+2. **Retry Service** tiêu thụ thông điệp từ `send_failed` và tính toán thời gian chờ (backoff).
+3. Sau thời gian chờ, thông điệp được đẩy vào topic `send_retry` để **Backend API** thử lại.
+4. Nếu số lần thử lại vượt quá `MAX_RETRIES` (mặc định là 3), thông điệp sẽ được chuyển vào topic `dead_letter` để kiểm tra thủ công.

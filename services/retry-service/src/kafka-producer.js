@@ -20,7 +20,7 @@ const publishSendRetry = async (message) => {
     topic: 'send_retry',
     messages: [{ key: message.command_id, value: JSON.stringify(message) }],
   });
-  console.log(`[Retry Service Producer] 🔄 Đã publish [${message.command_id}] → topic "send_retry" (retry #${message.retry_count})`);
+  console.log(`[Retry Service Producer] Đã publish [${message.command_id}] → topic "send_retry" (retry #${message.retry_count})`);
 };
 
 /**
@@ -41,7 +41,7 @@ const publishDeadLetter = async (message) => {
     topic: 'dead_letter',
     messages: [{ key: deadLetter.command_id, value: JSON.stringify(deadLetter) }],
   });
-  console.log(`[Retry Service Producer] ☠️  Đã publish [${deadLetter.command_id}] → topic "dead_letter" (vĩnh viễn thất bại)`);
+  console.log(`[Retry Service Producer]  Đã publish [${deadLetter.command_id}] → topic "dead_letter" (vĩnh viễn thất bại)`);
 };
 
 const disconnectProducer = async () => {
