@@ -32,11 +32,11 @@ Nội dung: "${content}"
         response_format: { type: "json_object" } // Ép JSON của OpenAI
       });
       return JSON.parse(response.choices[0].message.content);
-    } 
-    
+    }
+
     if (process.env.AI_PROVIDER === 'GEMINI' && genAI) {
-      const model = genAI.getGenerativeModel({ 
-        model: "gemini-2.5-flash",
+      const model = genAI.getGenerativeModel({
+        model: "gemini-2.5-flash-lite",
         generationConfig: { responseMimeType: "application/json" }
       });
       const result = await model.generateContent(prompt);

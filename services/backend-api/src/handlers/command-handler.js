@@ -12,7 +12,7 @@ const handleCommand = async (command) => {
   // retry_count có trong send_retry messages; mặc định 0 nếu lần đầu
   const retryCount = command.retry_count ?? 0;
 
-  console.log(`\n[Command Handler] 📥 Xử lý command [${command_id}]`);
+  console.log(`\n[Command Handler] Xử lý command [${command_id}]`);
   console.log(`  action      : ${action}`);
   console.log(`  comment_id  : ${target?.comment_id || 'N/A'}`);
   console.log(`  reply_text  : ${reply_text || 'N/A'}`);
@@ -49,7 +49,7 @@ const handleCommand = async (command) => {
       }
 
       default:
-        console.warn(`[Command Handler] ⚠️  Unknown action: "${action}" - bỏ qua`);
+        console.warn(`[Command Handler]  Unknown action: "${action}" - bỏ qua`);
         return;
     }
   } catch (error) {
