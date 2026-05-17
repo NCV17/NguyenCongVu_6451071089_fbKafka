@@ -105,8 +105,12 @@ services:
       - "9093:9093"
     volumes:
       - ./alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml
-    command:
-      - "--config.file=/etc/alertmanager/alertmanager.yml"
+    env_file:
+      - .env
+    entrypoint:
+      - /bin/sh
+      - -c
+      - "echo $$SLACK_WEBHOOK_URL > /tmp/slack_url && /bin/alertmanager --config.file=/etc/alertmanager/alertmanager.yml"
 
   # -- PostgreSQL --
   postgres:
