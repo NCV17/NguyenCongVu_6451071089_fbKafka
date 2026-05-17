@@ -107,9 +107,10 @@ services:
       - ./alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml
     env_file:
       - .env
-    command:
-      - "--config.file=/etc/alertmanager/alertmanager.yml"
-      - "--config.expand-env"
+    entrypoint:
+      - /bin/sh
+      - -c
+      - "echo $$SLACK_WEBHOOK_URL > /tmp/slack_url && /bin/alertmanager --config.file=/etc/alertmanager/alertmanager.yml"
 
   # -- PostgreSQL --
   postgres:

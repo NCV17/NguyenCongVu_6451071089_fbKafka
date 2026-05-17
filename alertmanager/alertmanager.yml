@@ -1,7 +1,7 @@
 global:
   resolve_timeout: 5m
-  # SỬA URL DƯỚI ĐÂY THÀNH SLACK INCOMING WEBHOOK URL THỰC TẾ CỦA BẠN
-  slack_api_url: '${SLACK_WEBHOOK_URL}'
+  # Đọc URL từ file tạm do script tự sinh ra từ biến môi trường
+  slack_api_url_file: '/tmp/slack_url'
 
 route:
   group_by: ['alertname']
