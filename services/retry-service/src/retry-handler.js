@@ -22,21 +22,21 @@ const calcBackoffDelay = (retryCount) => {
 const handleRetry = async (failedMessage) => {
   const { command_id, event_id, retry_count, last_error, payload } = failedMessage;
 
-  console.log(`\n[Retry Handler] 📥 Nhận failed message [${command_id}]`);
+  console.log(`\n[Retry Handler] Nhận failed message [${command_id}]`);
   console.log(`  retry_count : ${retry_count}`);
   console.log(`  last_error  : ${last_error}`);
   console.log(`  MAX_RETRIES : ${MAX_RETRIES}`);
 
   if (retry_count >= MAX_RETRIES) {
     // Đã vượt quá số lần retry → Dead Letter Queue
-    console.log(`[Retry Handler] ☠️  retry_count (${retry_count}) >= MAX_RETRIES (${MAX_RETRIES}) → Dead Letter Queue`);
+    console.log(`[Retry Handler]  retry_count (${retry_count}) >= MAX_RETRIES (${MAX_RETRIES}) → Dead Letter Queue`);
     await publishDeadLetter(failedMessage);
     return;
   }
 
   // Còn có thể retry
   const delay = calcBackoffDelay(retry_count);
-  console.log(`[Retry Handler] ⏳ Sẽ retry sau ${delay}ms (retry #${retry_count})...`);
+  console.log(`[Retry Handler] Sẽ retry sau ${delay}ms (retry #${retry_count})...`);
 
   // Chờ backoff delay rồi mới publish
   await new Promise((resolve) => setTimeout(resolve, delay));
@@ -56,7 +56,7 @@ const handleRetry = async (failedMessage) => {
   };
 
   await publishSendRetry(retryMessage);
-  console.log(`[Retry Handler] 🔄 Đã gửi lại → send_retry [retry #${retry_count}]`);
+  console.log(`[Retry Handler] Đã gửi lại → send_retry [retry #${retry_count}]`);
 };
 
 module.exports = { handleRetry };

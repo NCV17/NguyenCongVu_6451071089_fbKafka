@@ -22,7 +22,7 @@ const connectConsumer = async () => {
     eachMessage: async ({ topic, partition, message }) => {
       try {
         const command = JSON.parse(message.value.toString());
-        console.log(`\n[Backend API Consumer] 📨 Nhận từ topic [${topic}]`);
+        console.log(`\n[Backend API Consumer] Nhận từ topic [${topic}]`);
         await handleCommand(command);
       } catch (error) {
         console.error('[Backend API Consumer] ❌ Lỗi parse hoặc xử lý message:', error.message);
