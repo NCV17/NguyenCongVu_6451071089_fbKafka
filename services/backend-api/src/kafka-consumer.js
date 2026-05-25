@@ -13,7 +13,6 @@ const consumer = kafka.consumer({
 const connectConsumer = async () => {
   await consumer.connect();
 
-  // Consume cả reply_commands (lần đầu) lẫn send_retry (retry từ retry-service)
   await consumer.subscribe({ topics: ['reply_commands', 'send_retry'], fromBeginning: false });
 
   console.log('[Backend API Consumer] Đang lắng nghe topics: "reply_commands", "send_retry"');

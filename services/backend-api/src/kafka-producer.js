@@ -12,9 +12,7 @@ const connectProducer = async () => {
   console.log('[Backend API Producer] Đã kết nối Kafka producer.');
 };
 
-/**
- * Publish message tới topic send_failed khi gọi FB API thất bại
- */
+
 const publishSendFailed = async (command, retryCount, errorMessage) => {
   const message = {
     schema_version: 1,
