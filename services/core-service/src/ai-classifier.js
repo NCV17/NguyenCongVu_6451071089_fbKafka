@@ -29,7 +29,7 @@ Nội dung: "${content}"
       const response = await openai.chat.completions.create({
         model: "gpt-3.5-turbo",
         messages: [{ role: "user", content: prompt }],
-        response_format: { type: "json_object" } // Ép JSON của OpenAI
+        response_format: { type: "json_object" }
       });
       return JSON.parse(response.choices[0].message.content);
     }
@@ -41,7 +41,6 @@ Nội dung: "${content}"
       });
       const result = await model.generateContent(prompt);
       let text = result.response.text();
-      // Loại bỏ markdown code block nếu Gemini có trả về
       text = text.replace(/```json/g, '').replace(/```/g, '').trim();
       return JSON.parse(text);
     }

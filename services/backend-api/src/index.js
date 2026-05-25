@@ -8,7 +8,6 @@ const run = async () => {
   console.log(`[Backend API] FAKE_MODE = ${process.env.FAKE_MODE === 'true' ? 'BẬT (giả lập FB API)' : 'TẮT (gọi FB API thật)'}`);
   console.log('====================================================');
 
-  // Kết nối producer trước để sẵn sàng publish send_failed nếu cần
   await connectProducer();
 
   // Kết nối consumer và bắt đầu lắng nghe

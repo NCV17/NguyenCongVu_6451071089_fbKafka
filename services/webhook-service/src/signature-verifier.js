@@ -16,8 +16,6 @@ const verifySignature = (req, res, buf, encoding) => {
 
   if (signatureHash !== expectedHash) {
     console.warn('[Webhook] Cảnh báo: Chữ ký không hợp lệ! (Có thể do bạn điền Token vào chỗ của App Secret). Tạm thời bỏ qua để test ngrok.');
-    // Tạm thời comment dòng throw lỗi để không bị sập
-    // throw new Error('Invalid signature. Hash does not match.');
   }
 };
 
