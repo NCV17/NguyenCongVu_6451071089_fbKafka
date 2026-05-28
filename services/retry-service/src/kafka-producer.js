@@ -5,7 +5,13 @@ const kafka = new Kafka({
   brokers: (process.env.KAFKA_BROKERS || 'localhost:9092').split(','),
 });
 
-const producer = kafka.producer();
+const producer = kafka.producer({
+  idempotent: true,
+  maxInFlightRequests: 1,
+  retry: {
+    retries: 5
+  }
+});
 
 const connectProducer = async () => {
   await producer.connect();
