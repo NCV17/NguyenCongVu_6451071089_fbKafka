@@ -23,7 +23,6 @@ const normalizeAndPublish = async (body) => {
               status: 'received'
             };
 
-            // Đẩy vào Kafka
             await publishEvent('raw_events', normalizedEvent);
           }
         }
@@ -32,7 +31,6 @@ const normalizeAndPublish = async (body) => {
       if (entry.changes) {
         for (const change of entry.changes) {
           if (change.field === 'feed') {
-            // Sự kiện có bình luận mới
             if (change.value.item === 'comment' && change.value.verb === 'add') {
               if (change.value.from && String(change.value.from.id) === String(pageId)) continue;
 
@@ -52,7 +50,6 @@ const normalizeAndPublish = async (body) => {
               console.log(`[Webhook] Đã nhận Comment mới từ ${change.value.from.name}: "${change.value.message}"`);
               await publishEvent('raw_events', normalizedEvent);
             }
-            // Sự kiện có bài viết mới trên page
             else if (['status', 'post', 'photo', 'video', 'share'].includes(change.value.item) && change.value.verb === 'add') {
               const normalizedEvent = {
                 source: 'facebook',

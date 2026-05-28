@@ -18,7 +18,7 @@ const run = async () => {
   console.log('[Retry Service] ✅ Đã khởi động thành công!');
 };
 
-// Graceful shutdown
+
 const errorTypes = ['unhandledRejection', 'uncaughtException'];
 const signalTraps = ['SIGTERM', 'SIGINT', 'SIGUSR2'];
 

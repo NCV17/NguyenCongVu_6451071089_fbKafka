@@ -17,17 +17,14 @@ const handleRetry = async (failedMessage) => {
   console.log(`  MAX_RETRIES : ${MAX_RETRIES}`);
 
   if (retry_count >= MAX_RETRIES) {
-    // Đã vượt quá số lần retry → Dead Letter Queue
     console.log(`[Retry Handler]  retry_count (${retry_count}) >= MAX_RETRIES (${MAX_RETRIES}) → Dead Letter Queue`);
     await publishDeadLetter(failedMessage);
     return;
   }
 
-  // Còn có thể retry
   const delay = calcBackoffDelay(retry_count);
   console.log(`[Retry Handler] Sẽ retry sau ${delay}ms (retry #${retry_count})...`);
 
-  // Chờ backoff delay rồi mới publish
   await new Promise((resolve) => setTimeout(resolve, delay));
 
   const retryMessage = {
