@@ -6,11 +6,10 @@ const normalizeAndPublish = async (body) => {
       const pageId = entry.id;
       const timeOfEvent = entry.time;
 
-      // Xử lý Tin nhắn (Messages)
       if (entry.messaging) {
         for (const webhookEvent of entry.messaging) {
           const senderId = webhookEvent.sender.id;
-          
+
           if (webhookEvent.message && !webhookEvent.message.is_echo && webhookEvent.message.text) {
             const normalizedEvent = {
               source: 'facebook',
@@ -20,23 +19,19 @@ const normalizeAndPublish = async (body) => {
               timestamp: timeOfEvent,
               content: webhookEvent.message.text,
               messageId: webhookEvent.message.mid,
-              raw: webhookEvent, // Lưu lại raw nếu cần debug sau này
+              raw: webhookEvent,
               status: 'received'
             };
-            
-            // Đẩy vào Kafka
+
             await publishEvent('raw_events', normalizedEvent);
           }
         }
       }
 
-      // Xử lý Bình luận và Bài viết mới (Feed changes)
       if (entry.changes) {
         for (const change of entry.changes) {
           if (change.field === 'feed') {
-            // Sự kiện có bình luận mới
             if (change.value.item === 'comment' && change.value.verb === 'add') {
-              // Bỏ qua bình luận do chính Page (Bot) phản hồi để tránh vòng lặp vô hạn (Dùng String để so sánh an toàn)
               if (change.value.from && String(change.value.from.id) === String(pageId)) continue;
 
               const normalizedEvent = {
@@ -54,8 +49,7 @@ const normalizeAndPublish = async (body) => {
               };
               console.log(`[Webhook] Đã nhận Comment mới từ ${change.value.from.name}: "${change.value.message}"`);
               await publishEvent('raw_events', normalizedEvent);
-            } 
-            // Sự kiện có bài viết mới trên page
+            }
             else if (['status', 'post', 'photo', 'video', 'share'].includes(change.value.item) && change.value.verb === 'add') {
               const normalizedEvent = {
                 source: 'facebook',

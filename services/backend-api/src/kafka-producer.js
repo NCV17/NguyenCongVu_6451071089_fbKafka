@@ -5,16 +5,20 @@ const kafka = new Kafka({
   brokers: (process.env.KAFKA_BROKERS || 'localhost:9092').split(','),
 });
 
-const producer = kafka.producer();
+const producer = kafka.producer({
+  idempotent: true,
+  maxInFlightRequests: 1,
+  retry: {
+    retries: 5
+  }
+});
 
 const connectProducer = async () => {
   await producer.connect();
   console.log('[Backend API Producer] Đã kết nối Kafka producer.');
 };
 
-/**
- * Publish message tới topic send_failed khi gọi FB API thất bại
- */
+
 const publishSendFailed = async (command, retryCount, errorMessage) => {
   const message = {
     schema_version: 1,

@@ -1,23 +1,19 @@
 const makeDecision = async (event, spamResult, aiResult) => {
   console.log(`[Decision Engine] Đang xử lý [${event.type.toUpperCase()}] từ ${event.senderName}`);
 
-  // 1. Xử lý Spam -> Xóa bình luận
   if (spamResult.isSpam) {
     console.log(`=> HÀNH ĐỘNG: [ẨN BÌNH LUẬN] - Lý do: Spam / Chứa liên kết.`);
     return 'hidden';
   }
 
-  // Nếu API AI chưa cấu hình thì bỏ qua
   if (aiResult.error === 'AI_NOT_CONFIGURED') {
     console.log(`=> HÀNH ĐỘNG: [BỎ QUA] - Lý do: Chưa cấu hình API Key của AI.`);
     return 'no_action';
   }
 
-  // 2. Xử lý tự động hóa theo cảm xúc (Sentiment)
   let intent = aiResult.intent;
   let sentiment = aiResult.sentiment;
 
-  // Fallback bằng từ khóa nếu AI bị lỗi (vd: Quota exceeded) hoặc không nhận diện được
   if (intent === 'unknown' && sentiment === 'neutral') {
     const textLower = event.content ? event.content.toLowerCase() : '';
     if (textLower.includes('giá') || textLower.includes('nhiêu') || textLower.includes('ib') || textLower.includes('chuẩn')) {

@@ -13,17 +13,15 @@ const kafka = new Kafka({
 
 const consumer = kafka.consumer({ groupId: process.env.KAFKA_GROUP_ID || 'core-service-group' });
 
-// Map decision → reply_commands action
 const DECISION_TO_ACTION = {
   reply_positive: 'reply',
   reply_negative: 'reply',
-  auto_reply:     'reply',
-  hidden:         'hide',
-  delete:         'delete',
+  auto_reply: 'reply',
+  hidden: 'hide',
+  delete: 'delete',
   hidden_and_queued: 'hide',
 };
 
-// Reply texts
 const REPLY_TEXTS = {
   reply_positive: [
     'Cảm ơn bạn đã ủng hộ shop!',
@@ -45,7 +43,6 @@ const REPLY_TEXTS = {
 const pickRandom = (arr) => arr[Math.floor(Math.random() * arr.length)];
 
 const run = async () => {
-  // Kết nối producer trước
   await connectProducer();
   await consumer.connect();
   await consumer.subscribe({ topic: 'raw_events', fromBeginning: false });
@@ -63,22 +60,17 @@ const run = async () => {
 
         console.log(`\n>> Nhận event mới: [${event.type}] - Nội dung: "${event.content}"`);
 
-        // Bước 1: Lọc Spam
         const spamResult = detectSpam(event.content);
 
-        // Bước 2: AI Classification (chỉ gọi nếu không phải spam)
         let aiResult = { intent: 'unknown', sentiment: 'neutral' };
         if (!spamResult.isSpam) {
           aiResult = await classifyEvent(event.content);
         }
 
-        // Bước 3: Ra quyết định
         const decision = await makeDecision(event, spamResult, aiResult);
 
         console.log(`[Core Service] Decision: ${decision} | Intent: ${aiResult.intent} | Sentiment: ${aiResult.sentiment}`);
 
-        // Bước 4: Map decision → reply_command và publish Kafka
-        // (KHÔNG gọi Facebook API trực tiếp nữa)
         const action = DECISION_TO_ACTION[decision];
 
         if (!action || decision === 'no_action' || decision === 'notify_staff') {
@@ -86,7 +78,6 @@ const run = async () => {
           return;
         }
 
-        // Build reply_text nếu action là reply
         let replyText = null;
         if (action === 'reply') {
           const texts = REPLY_TEXTS[decision];
@@ -101,14 +92,14 @@ const run = async () => {
           action,
           target: {
             comment_id: event.commentId || null,
-            sender_id:  event.senderId  || null,
-            type:       event.type      || 'comment',
+            sender_id: event.senderId || null,
+            type: event.type || 'comment',
           },
-          reply_text:  replyText,
-          intent:      aiResult.intent,
-          sentiment:   aiResult.sentiment,
+          reply_text: replyText,
+          intent: aiResult.intent,
+          sentiment: aiResult.sentiment,
           spam_result: spamResult,
-          created_at:  new Date().toISOString(),
+          created_at: new Date().toISOString(),
         };
 
         // Publish tới topic reply_commands
@@ -123,7 +114,6 @@ const run = async () => {
   });
 };
 
-// Graceful shutdown
 const errorTypes = ['unhandledRejection', 'uncaughtException'];
 const signalTraps = ['SIGTERM', 'SIGINT', 'SIGUSR2'];
 

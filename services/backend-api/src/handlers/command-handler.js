@@ -1,12 +1,7 @@
 const facebookApi = require('../facebook-api');
 const { publishSendFailed } = require('../kafka-producer');
 
-/**
- * Xử lý một reply_command hoặc send_retry từ Kafka.
- * - Gọi Facebook Graph API tương ứng với action
- * - Nếu thành công: log success
- * - Nếu thất bại: publish send_failed
- */
+
 const handleCommand = async (command) => {
   const { command_id, event_id, action, target, reply_text } = command;
   // retry_count có trong send_retry messages; mặc định 0 nếu lần đầu
@@ -37,7 +32,7 @@ const handleCommand = async (command) => {
       case 'delete': {
         if (!target?.comment_id) throw new Error('Thiếu comment_id để delete');
         await facebookApi.deleteComment(target.comment_id);
-        console.log(`[Command Handler] 🗑️ SUCCESS - delete comment ${target.comment_id}`);
+        console.log(`[Command Handler]  SUCCESS - delete comment ${target.comment_id}`);
         break;
       }
 
