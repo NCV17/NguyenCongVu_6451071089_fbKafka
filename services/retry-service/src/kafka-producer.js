@@ -12,9 +12,7 @@ const connectProducer = async () => {
   console.log('[Retry Service Producer] Đã kết nối Kafka producer.');
 };
 
-/**
- * Publish tới send_retry (retry_count < MAX_RETRIES)
- */
+
 const publishSendRetry = async (message) => {
   await producer.send({
     topic: 'send_retry',
@@ -23,18 +21,16 @@ const publishSendRetry = async (message) => {
   console.log(`[Retry Service Producer] Đã publish [${message.command_id}] → topic "send_retry" (retry #${message.retry_count})`);
 };
 
-/**
- * Publish tới dead_letter (retry_count >= MAX_RETRIES)
- */
+
 const publishDeadLetter = async (message) => {
   const deadLetter = {
     schema_version: 1,
-    command_id:  message.command_id,
-    event_id:    message.event_id,
+    command_id: message.command_id,
+    event_id: message.event_id,
     retry_count: message.retry_count,
     final_error: message.last_error || 'Facebook timeout after maximum retries',
-    payload:     message.payload,
-    dead_at:     new Date().toISOString(),
+    payload: message.payload,
+    dead_at: new Date().toISOString(),
   };
 
   await producer.send({

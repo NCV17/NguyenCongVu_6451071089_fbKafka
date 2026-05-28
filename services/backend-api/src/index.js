@@ -10,7 +10,6 @@ const run = async () => {
 
   await connectProducer();
 
-  // Kết nối consumer và bắt đầu lắng nghe
   await connectConsumer();
 
   console.log('[Backend API] ✅ Đã khởi động thành công!');
@@ -18,7 +17,6 @@ const run = async () => {
   console.log('[Backend API] Publish: send_failed (khi lỗi)');
 };
 
-// Graceful shutdown
 const errorTypes = ['unhandledRejection', 'uncaughtException'];
 const signalTraps = ['SIGTERM', 'SIGINT', 'SIGUSR2'];
 

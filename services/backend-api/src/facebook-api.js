@@ -1,10 +1,7 @@
-
-
 const FAKE_MODE = process.env.FAKE_MODE === 'true';
 const PAGE_ACCESS_TOKEN = process.env.PAGE_ACCESS_TOKEN;
 const FB_API_VERSION = process.env.FB_API_VERSION || 'v19.0';
 const FB_BASE_URL = `https://graph.facebook.com/${FB_API_VERSION}`;
-
 
 const fakeSuccess = (action, details) => {
   console.log(`[Facebook API - FAKE] ✅ ${action}:`, details);
@@ -18,7 +15,6 @@ const fakeFail = (action, details) => {
 
 
 const realPost = async (url, body) => {
-  // Dynamic require: axios không bắt buộc khi FAKE_MODE=true
   const axios = require('axios');
   try {
     const response = await axios.post(url, { ...body, access_token: PAGE_ACCESS_TOKEN });
